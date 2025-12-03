@@ -1,0 +1,10 @@
+.cm-editor {
+  height: 100%;
+}
+.cm-scroller {
+  overflow: auto;
+}
+
+.cm-editor .cm-content {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}

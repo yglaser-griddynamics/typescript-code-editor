@@ -55,5 +55,11 @@
     "jsdom": "^27.1.0",
     "typescript": "~5.9.2",
     "vitest": "^4.0.8"
+  },
+  "resolutions": {
+    "@codemirror/state": "6.4.1",
+    "@codemirror/view": "6.21.0",
+    "@codemirror/lang-javascript": "6.2.1",
+    "@codemirror/theme-one-dark": "6.1.3"
   }
 }
