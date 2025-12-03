@@ -1,0 +1,16 @@
+<div class="card h-100 p-4">
+  <h5 class="card-title">🚀 Create Room</h5>
+  <p class="text-muted small">Create a new session or join an existing room ID.</p>
+
+  <div class="input-group mt-3">
+    <input
+      type="text"
+      class="form-control form-control-lg"
+      placeholder="Room ID (e.g. coding-12)"
+      [(ngModel)]="inputRoomId"
+      (keyup.enter)="submit()"
+    />
+
+    <button class="btn btn-primary px-4" type="button" (click)="submit()">JOIN</button>
+  </div>
+</div>
