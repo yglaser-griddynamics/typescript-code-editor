@@ -1,13 +1,18 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { Editor } from './editor/editor';
 
 const routes: Routes = [
   {
     path: '',
-    component: Editor,
+    redirectTo: 'default-room',
+    pathMatch: 'full',
+  },
+  {
+    path: ':roomId',
+    loadComponent: () => import('./editor/editor').then((m) => m.Editor),
   },
 ];
+
 @NgModule({
   imports: [RouterModule.forChild(routes)],
   exports: [RouterModule],
