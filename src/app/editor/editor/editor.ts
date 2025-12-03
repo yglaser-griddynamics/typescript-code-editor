@@ -1,32 +1,43 @@
-import { Component, OnInit, signal, computed, ViewChild, ElementRef } from '@angular/core';
+// angular imports
+import {
+  Component,
+  OnInit,
+  AfterViewInit,
+  OnDestroy,
+  signal,
+  computed,
+  ViewChild,
+  ElementRef,
+} from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 
-import { EditorView } from '@codemirror/view';
-import { basicSetup } from 'codemirror';
+// code mirror imports
+import { EditorView, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { minimalSetup } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 
 @Component({
   selector: 'app-editor',
-
+  imports: [CommonModule],
   templateUrl: './editor.html',
-  styleUrl: './editor.css',
+  styleUrls: ['./editor.css'],
 })
-export class Editor implements OnInit {
+export class Editor implements OnInit, AfterViewInit, OnDestroy {
   roomId: string = '';
   code = signal<string>(`// Welcome to CodeMirror 6
 function initialize() {
-  console.log("Syntax Highlighting is active!");
+  console.log("You can start coding right away!");
 }`);
 
   cursorLine = signal(1);
   cursorCol = signal(1);
-  lineNumbers = computed(() => {
-    const lines = this.code().split('\n').length;
-    return Array.from({ length: lines }, (_, i) => i + 1);
-  });
+
+  lineNumbers = computed(() =>
+    Array.from({ length: this.code().split('\n').length }, (_, i) => i + 1)
+  );
 
   @ViewChild('editorContainer') editorContainer!: ElementRef<HTMLDivElement>;
   private editorView!: EditorView;
@@ -35,7 +46,7 @@ function initialize() {
 
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
-      this.roomId = params.get('roomId') || 'unknown';
+      this.roomId = params.get('roomId') ?? 'unknown';
     });
   }
 
@@ -43,14 +54,21 @@ function initialize() {
     const startState = EditorState.create({
       doc: this.code(),
       extensions: [
-        minimalSetup,
-        javascript(),
+        history(),
         oneDark,
+        javascript(),
+
+        keymap.of([...defaultKeymap, ...historyKeymap]),
+
         EditorView.lineWrapping,
 
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) this.code.set(update.state.doc.toString());
-          if (update.selectionSet) this.updateCursorStats(update.state);
+          if (update.docChanged) {
+            this.code.set(update.state.doc.toString());
+          }
+          if (update.selectionSet) {
+            this.updateCursor(update.state);
+          }
         }),
       ],
     });
@@ -60,17 +78,16 @@ function initialize() {
       parent: this.editorContainer.nativeElement,
     });
   }
-  private updateCursorStats(state: EditorState): void {
-    const selection = state.selection.main;
-    const line = state.doc.lineAt(selection.head);
+
+  private updateCursor(state: EditorState) {
+    const sel = state.selection.main;
+    const line = state.doc.lineAt(sel.head);
 
     this.cursorLine.set(line.number);
-    this.cursorCol.set(selection.head - line.from + 1);
+    this.cursorCol.set(sel.head - line.from + 1);
   }
 
   ngOnDestroy(): void {
-    if (this.editorView) {
-      this.editorView.destroy();
-    }
+    this.editorView?.destroy();
   }
 }
