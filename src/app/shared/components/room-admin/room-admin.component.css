@@ -1,0 +1,48 @@
+.admin-container {
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+  width: 100%;
+}
+
+.card {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.card-title {
+  color: white;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.list-group-item {
+  background-color: transparent;
+  border-color: var(--border-color);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.list-group-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  padding-left: 20px; /* Slide animation */
+  border-left: 4px solid var(--accent);
+}
+
+.list-group-item .badge {
+  background-color: var(--accent) !important;
+  color: white;
+}
+
+.empty-state {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+}

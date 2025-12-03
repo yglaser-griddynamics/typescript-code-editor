@@ -1,11 +1,30 @@
-<router-outlet></router-outlet>
-<nav class="navbar navbar-light bg-light border-bottom mb-3">
+<nav class="navbar navbar-dark bg-dark border-bottom border-secondary mb-0">
   <div class="container-fluid">
-    <h1 class="app-title">Welcome to {{ title() }}</h1>
-    <span class="badge bg-dark">AI Powered by Gemini</span>
+    <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#007acc"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="16 18 22 12 16 6"></polyline>
+        <polyline points="8 6 2 12 8 18"></polyline>
+      </svg>
+      <span class="fw-bold" style="letter-spacing: -0.5px">TS Editor</span>
+    </a>
+
+    <div class="d-flex align-items-center gap-3">
+      <span class="badge bg-secondary opacity-50">v1.0.0-beta</span>
+      <span class="text-muted small">Powered by <span style="color: #4fabff">Gemini</span></span>
+    </div>
   </div>
 </nav>
 
-<app-room-admin></app-room-admin>
-
-<router-outlet></router-outlet>
+<div class="main-content">
+  <app-room-admin></app-room-admin>
+  <router-outlet></router-outlet>
+</div>

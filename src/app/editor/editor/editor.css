@@ -19,7 +19,6 @@
 .line-number {
   height: 20px;
   padding-right: 5px;
-  font-size: 15px;
 }
 
 .line-number.active {
