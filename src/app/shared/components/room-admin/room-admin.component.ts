@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { RoomService } from '../../../core/services/room.service';
 
@@ -8,7 +8,7 @@ import { RoomService } from '../../../core/services/room.service';
   styleUrls: ['./room-admin.component.css'],
   standalone: false,
 })
-export class RoomAdminComponent {
+export class RoomAdminComponent implements OnInit {
   inputRoomId: string = '';
   rooms$;
 
@@ -16,12 +16,14 @@ export class RoomAdminComponent {
     this.rooms$ = this.roomService.rooms$;
   }
 
+  ngOnInit() {
+    this.roomService.leaveRoom();
+  }
+
   enterRoom(roomId: string) {
     if (!roomId.trim()) return;
-    this.roomService.addRoom(roomId);
+    this.roomService.enterRoom(roomId);
     this.router.navigate(['/', roomId]);
     this.inputRoomId = '';
   }
 }
-
-
