@@ -57,7 +57,10 @@ function initialize() {
   ngAfterViewInit(): void {
     const ytext = this.wsService.getSharedText('codemirror');
     this.awareness = new Awareness(this.wsService.ydoc);
-
+    let initialDoc = ytext.toString();
+    if (ytext.toString().length === 0) {
+      ytext.insert(0, this.code());
+    }
     const mockCompletion = autocompletion({
       override: [
         async (context) => {
