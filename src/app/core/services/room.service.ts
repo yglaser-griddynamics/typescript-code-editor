@@ -2,12 +2,7 @@ import { Injectable, OnDestroy } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
-
-export interface Room {
-  id: string;
-  name: string;
-  users: number;
-}
+import { Room } from '../models/rooms.model';
 
 @Injectable({
   providedIn: 'root',
