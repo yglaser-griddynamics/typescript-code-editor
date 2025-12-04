@@ -19,6 +19,7 @@ import { autocompletion } from '@codemirror/autocomplete';
 import { yCollab } from 'y-codemirror.next';
 import { Awareness } from 'y-protocols/awareness';
 import { YjsWebsocketService } from '../../core/services/YjsWebsocket.service';
+import { RoomService } from '../../core/services/room.service';
 
 @Component({
   selector: 'app-editor',
@@ -45,7 +46,11 @@ function initialize() {
 
   @ViewChild('editorContainer') editorContainer!: ElementRef<HTMLDivElement>;
 
-  constructor(private route: ActivatedRoute, private wsService: YjsWebsocketService) {}
+  constructor(
+    private route: ActivatedRoute,
+    private wsService: YjsWebsocketService,
+    private roomService: RoomService
+  ) {}
 
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
@@ -57,7 +62,7 @@ function initialize() {
   ngAfterViewInit(): void {
     const ytext = this.wsService.getSharedText('codemirror');
     this.awareness = new Awareness(this.wsService.ydoc);
-    let initialDoc = ytext.toString();
+
     if (ytext.toString().length === 0) {
       ytext.insert(0, this.code());
     }

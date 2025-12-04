@@ -22,7 +22,6 @@ export class RoomAdminComponent implements OnInit {
 
   enterRoom(roomId: string) {
     if (!roomId.trim()) return;
-    this.roomService.enterRoom(roomId);
     this.router.navigate(['/', roomId]);
     this.inputRoomId = '';
   }
