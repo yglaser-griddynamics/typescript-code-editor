@@ -9,9 +9,9 @@ import { vi } from 'vitest';
 describe('RoomAdminComponent', () => {
   let component: RoomAdminComponent;
   let fixture: ComponentFixture<RoomAdminComponent>;
-
   let mockRoomService: {
-    addRoom: ReturnType<typeof vi.fn>;
+    enterRoom: ReturnType<typeof vi.fn>;
+    leaveRoom: ReturnType<typeof vi.fn>;
     rooms$: any;
   };
 
@@ -21,7 +21,8 @@ describe('RoomAdminComponent', () => {
 
   beforeEach(async () => {
     mockRoomService = {
-      addRoom: vi.fn(),
+      enterRoom: vi.fn(),
+      leaveRoom: vi.fn(),
       rooms$: of([{ id: 'mock-room', name: 'Mock', users: 0 }]),
     };
 
@@ -47,6 +48,10 @@ describe('RoomAdminComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('should ensure user leaves any previous room on init', () => {
+    expect(mockRoomService.leaveRoom).toHaveBeenCalled();
+  });
+
   it('should initialize rooms$ from service', async () => {
     const rooms = await firstValueFrom(component.rooms$);
 
@@ -56,17 +61,14 @@ describe('RoomAdminComponent', () => {
 
   it('enterRoom should do nothing if roomId is empty', () => {
     component.enterRoom('');
-
-    expect(mockRoomService.addRoom).not.toHaveBeenCalled();
+    expect(mockRoomService.enterRoom).not.toHaveBeenCalled();
     expect(mockRouter.navigate).not.toHaveBeenCalled();
   });
 
-  it('enterRoom should add room and navigate when roomId is valid', () => {
+  it('enterRoom should enter room and navigate when roomId is valid', () => {
     const roomId = 'new-session';
-
-    component.enterRoom(roomId);
-
-    expect(mockRoomService.addRoom).toHaveBeenCalledWith(roomId);
+    component.enterRoom(roomId);    
+    expect(mockRoomService.enterRoom).toHaveBeenCalledWith(roomId);
     expect(mockRouter.navigate).toHaveBeenCalledWith(['/', roomId]);
     expect(component.inputRoomId).toBe('');
   });
