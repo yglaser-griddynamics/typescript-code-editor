@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
-import { YjsCollab } from './yjs-collab';
+import { YjsCollab } from './YjsWebsocket.service';
 
 describe('YjsCollab', () => {
   let service: YjsCollab;

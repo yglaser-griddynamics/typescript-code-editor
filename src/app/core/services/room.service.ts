@@ -14,7 +14,9 @@ export class RoomService implements OnDestroy {
   private STORAGE_KEY = 'webstudio_rooms';
 
   // Reactive state of all rooms
-  private roomsSubject = new BehaviorSubject<Room[]>([]);
+  private roomsSubject = new BehaviorSubject<Room[]>([
+    { id: 'default', name: 'default', users: 0 },
+  ]);
   rooms$ = this.roomsSubject.asObservable();
 
   // Track which room THIS specific browser tab is currently in

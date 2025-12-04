@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
-import { AiApi } from './ai-api';
+import { AiApi } from './AiCompletion.service';
 
 describe('AiApi', () => {
   let service: AiApi;

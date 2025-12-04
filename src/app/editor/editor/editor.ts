@@ -10,17 +10,15 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
-// code mirror inports
 import { EditorView, keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { autocompletion } from '@codemirror/autocomplete';
-// webrtc yjs imports
-import * as Y from 'yjs';
-import { WebrtcProvider } from 'y-webrtc';
 import { yCollab } from 'y-codemirror.next';
+import { Awareness } from 'y-protocols/awareness';
+import { YjsWebsocketService } from '../../core/services/YjsWebsocket.service';
 
 @Component({
   selector: 'app-editor',
@@ -42,25 +40,23 @@ function initialize() {
     Array.from({ length: this.code().split('\n').length }, (_, i) => i + 1)
   );
 
-  ydoc!: Y.Doc;
-  provider!: WebrtcProvider;
   editorView!: EditorView;
+  awareness!: Awareness;
 
   @ViewChild('editorContainer') editorContainer!: ElementRef<HTMLDivElement>;
 
-  constructor(private route: ActivatedRoute) {}
+  constructor(private route: ActivatedRoute, private wsService: YjsWebsocketService) {}
 
   ngOnInit(): void {
     this.route.paramMap.subscribe((params) => {
       this.roomId = params.get('roomId') ?? 'unknown';
+      this.wsService.connect(this.roomId);
     });
-
-    this.ydoc = new Y.Doc();
-    this.provider = new WebrtcProvider(this.roomId, this.ydoc);
   }
 
   ngAfterViewInit(): void {
-    const ytext = this.ydoc.getText('codemirror');
+    const ytext = this.wsService.getSharedText('codemirror');
+    this.awareness = new Awareness(this.wsService.ydoc);
 
     const mockCompletion = autocompletion({
       override: [
@@ -81,12 +77,12 @@ function initialize() {
     });
 
     const startState = EditorState.create({
-      doc: this.code(),
+      doc: ytext.toString(),
       extensions: [
         history(),
         oneDark,
         javascript(),
-        yCollab(ytext, this.provider.awareness),
+        yCollab(ytext, this.awareness),
         mockCompletion,
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
@@ -110,8 +106,6 @@ function initialize() {
   }
 
   ngOnDestroy(): void {
-    this.provider.destroy();
-    this.ydoc.destroy();
     if (this.editorView) {
       this.editorView.destroy();
     }
