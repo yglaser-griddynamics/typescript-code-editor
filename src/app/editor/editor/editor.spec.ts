@@ -9,7 +9,7 @@ import { Awareness } from 'y-protocols/awareness';
 import { EditorView } from '@codemirror/view';
 import { undo, redo } from '@codemirror/commands';
 import { autocompletion } from '@codemirror/autocomplete';
-import { YjsWebsocketService } from '../../core/services/YjsWebsocket.service';
+import { YjsWebsocketService } from '../../core/services/yjs-websocket.service';
 import { RoomService } from '../../core/services/room.service';
 
 class MockYjsWebsocketService {
