@@ -16,11 +16,17 @@ import { EditorState } from '@codemirror/state';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { autocompletion } from '@codemirror/autocomplete';
+import {
+  autocompletion,
+  Completion,
+  CompletionContext,
+  CompletionResult,
+} from '@codemirror/autocomplete';
 import { yCollab } from 'y-codemirror.next';
 import { Awareness } from 'y-protocols/awareness';
 import { YjsWebsocketService } from '../../core/services/YjsWebsocket.service';
 import { RoomService } from '../../core/services/room.service';
+import { AiCompletionService } from '../../core/services/AiCompletion.service';
 
 @Component({
   selector: 'app-editor',
@@ -49,7 +55,8 @@ function initialize() {
   constructor(
     private route: ActivatedRoute,
     private wsService: YjsWebsocketService,
-    private roomService: RoomService
+    private roomService: RoomService,
+    private aiCompletionService: AiCompletionService
   ) {}
 
   ngOnInit(): void {
@@ -66,7 +73,35 @@ function initialize() {
   }
 
   ngAfterViewInit(): void {}
+  aiCompletionSource = async (context: CompletionContext): Promise<CompletionResult | null> => {
+    const lastChar = context.state.sliceDoc(context.pos - 1, context.pos);
+    const triggerChars = /[\w.]/;
 
+    if (context.explicit || triggerChars.test(lastChar)) {
+      const fullText = context.state.doc.toString();
+      const cursorPosition = context.pos;
+
+      const result = await this.aiCompletionService.getCompletions({
+        fullText: fullText,
+        cursorPosition: cursorPosition,
+      });
+
+      const completions: Completion[] = result.suggestions.map((suggestion) => ({
+        label: suggestion.label,
+        type: suggestion.type,
+        apply: suggestion.label,
+      }));
+
+      if (completions.length > 0) {
+        return {
+          from: context.pos,
+          options: completions,
+        };
+      }
+    }
+
+    return null;
+  };
   initializeCodeMirror(): void {
     const ytext = this.wsService.getSharedText('codemirror');
 
@@ -95,6 +130,12 @@ function initialize() {
       ],
     });
 
+    const aiCompletion = autocompletion({
+      override: [this.aiCompletionSource],
+      // Optional: Increase the delay to reduce API calls while typing rapidly
+      // activateOnType: true,
+      // maxRenderedOptions: 1
+    });
     const startState = EditorState.create({
       doc: ytext.toString(),
       extensions: [
@@ -102,7 +143,7 @@ function initialize() {
         oneDark,
         javascript(),
         yCollab(ytext, awareness),
-        mockCompletion,
+        aiCompletion,
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
