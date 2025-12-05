@@ -34,6 +34,7 @@ import { AiCompletionService } from '../../core/services/ai-completion.service';
   styleUrls: ['./editor.css'],
 })
 export class Editor implements OnInit, AfterViewInit, OnDestroy {
+  private readonly DEBOUNCE_DELAY = 1;
   roomId: string = '';
   code = signal<string>(`// Welcome to CodeMirror 6
 function initialize() {
@@ -85,54 +86,46 @@ function initialize() {
     };
   }
 
-  private getAiCompletions(context: CompletionContext): Promise<CompletionResult | null> {
+  private async getAiCompletions(context: CompletionContext): Promise<CompletionResult | null> {
     const word = context.matchBefore(/\w*(\.)?\w*/);
 
     if (!word || (word.from === context.pos && !context.explicit)) {
-      if (!context.explicit) return Promise.resolve(null);
+      if (!context.explicit) return null;
     }
 
-    return new Promise((resolve) => {
-      if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    try {
+      const fullText = context.state.doc.toString();
+      const cursorPosition = context.pos;
 
-      this.debounceTimer = setTimeout(async () => {
-        try {
-          const fullText = context.state.doc.toString();
-          const cursorPosition = context.pos;
+      const result = await this.aiCompletionService.getCompletions({
+        fullText,
+        cursorPosition,
+      });
 
-          const result = await this.aiCompletionService.getCompletions({
-            fullText: fullText,
-            cursorPosition: cursorPosition,
-          });
+      if (result.suggestions && result.suggestions.length > 0) {
+        const rawLabel = result.suggestions[0].label;
 
-          if (result.suggestions && result.suggestions.length > 0) {
-            const rawLabel = result.suggestions[0].label;
+        const shortLabel = rawLabel.length > 50 ? rawLabel.substring(0, 47) + '...' : rawLabel;
 
-            const shortLabel = rawLabel.length > 50 ? rawLabel.substring(0, 47) + '...' : rawLabel;
+        const completions: Completion[] = [
+          {
+            label: shortLabel,
+            detail: '✨ AI',
+            type: 'snippet',
+            apply: rawLabel,
+            boost: 99,
+          },
+        ];
 
-            const completions: Completion[] = [
-              {
-                label: shortLabel,
-                detail: '✨ AI',
-                type: 'text',
-                apply: rawLabel,
-                boost: 99,
-              },
-            ];
+        return {
+          from: word ? word.from : context.pos,
+          options: completions,
+          filter: false,
+        };
+      }
+    } catch (err) {}
 
-            resolve({
-              from: word ? word.from : context.pos,
-              options: completions,
-              filter: false,
-            });
-            return;
-          }
-        } catch (error) {
-          console.warn('AI Completion failed, using mock.', error);
-        }
-        resolve(this.getMockCompletions(context));
-      }, 1);
-    });
+    return this.getMockCompletions(context);
   }
 
   initializeCodeMirror(): void {
@@ -144,12 +137,12 @@ function initialize() {
       return;
     }
 
-    const hybridCompletion = autocompletion({
+    const autocompleteWithAi = autocompletion({
       override: [this.getAiCompletions.bind(this)],
       icons: true,
       interactionDelay: 1,
     });
-
+  
     const startState = EditorState.create({
       doc: ytext.toString(),
       extensions: [
@@ -157,7 +150,7 @@ function initialize() {
         oneDark,
         javascript(),
         yCollab(ytext, awareness),
-        hybridCompletion,
+        autocompleteWithAi,
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
