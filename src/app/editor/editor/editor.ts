@@ -32,8 +32,11 @@ import { fullCompletion } from '../utils/completion';
 })
 export class Editor implements OnInit, OnDestroy {
   @ViewChild('editorContainer') container!: ElementRef<HTMLDivElement>;
+  public editorContainer!: ElementRef<HTMLDivElement>;
 
   editor!: EditorView;
+  editorView!: EditorView;
+
   roomId = '';
 
   cursorLine = signal(1);
@@ -57,10 +60,9 @@ function initialize() {
   ngOnInit(): void {
     this.route.paramMap.subscribe(async (p) => {
       this.roomId = p.get('roomId') ?? 'room';
-
       await this.ws.connect(this.roomId);
 
-      if (this.editor) this.editor.destroy();
+      if (this.editorView) this.editorView.destroy();
       this.initEditor();
     });
   }
@@ -68,11 +70,7 @@ function initialize() {
   private initEditor(): void {
     const ytext = this.ws.getSharedText('codemirror');
     const awareness = this.ws.getAwareness();
-
-    const autocompleteExt = autocompletion({
-      override: [fullCompletion(this.ai)],
-      activateOnTyping: true,
-    });
+    this.editorContainer = this.container;
 
     const state = EditorState.create({
       doc: ytext.toString(),
@@ -81,31 +79,29 @@ function initialize() {
         javascript(),
         history(),
         yCollab(ytext, awareness),
-        autocompleteExt,
+        autocompletion({ override: [fullCompletion(this.ai)] }),
         keymap.of([...defaultKeymap, ...historyKeymap]),
 
-        EditorView.lineWrapping,
-
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
-            this.code.set(update.state.doc.toString());
-          }
-          if (update.selectionSet) {
-            this.updateCursor(update.state);
-          }
+          if (update.docChanged) this.code.set(update.state.doc.toString());
+          if (update.selectionSet) this.updateCursor(update.state);
         }),
       ],
     });
 
-    this.editor = new EditorView({
+    const view = new EditorView({
       state,
       parent: this.container.nativeElement,
     });
 
-    this.updateCursor(this.editor.state);
+    this.editor = view;
+    this.editorView = view;
+
+    this.updateCursor(view.state);
   }
 
-  private updateCursor(state: EditorState): void {
+
+  updateCursor(state: EditorState): void {
     const pos = state.selection.main.head;
     const line = state.doc.lineAt(pos);
 
@@ -114,7 +110,7 @@ function initialize() {
   }
 
   ngOnDestroy(): void {
-    this.editor?.destroy();
+    this.editorView?.destroy();
     this.ws.destroy();
   }
 }
