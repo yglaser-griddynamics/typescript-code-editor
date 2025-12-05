@@ -1,3 +1,4 @@
+// editor.ts
 import {
   Component,
   OnInit,
@@ -42,7 +43,6 @@ function initialize() {
   );
 
   editorView!: EditorView;
-  awareness!: Awareness;
 
   @ViewChild('editorContainer') editorContainer!: ElementRef<HTMLDivElement>;
 
@@ -53,19 +53,30 @@ function initialize() {
   ) {}
 
   ngOnInit(): void {
-    this.route.paramMap.subscribe((params) => {
+    this.route.paramMap.subscribe(async (params) => {
       this.roomId = params.get('roomId') ?? 'unknown';
-      this.wsService.connect(this.roomId);
+
+      await this.wsService.connect(this.roomId);
+
+      if (this.editorView) {
+        this.editorView.destroy();
+      }
+      this.initializeCodeMirror();
     });
   }
 
-  ngAfterViewInit(): void {
-    const ytext = this.wsService.getSharedText('codemirror');
-    this.awareness = new Awareness(this.wsService.ydoc);
+  ngAfterViewInit(): void {}
 
-    if (ytext.toString().length === 0) {
-      ytext.insert(0, this.code());
+  initializeCodeMirror(): void {
+    const ytext = this.wsService.getSharedText('codemirror');
+
+    const awareness = this.wsService.getAwareness();
+
+    if (!awareness) {
+      console.error('Awareness object is not available.');
+      return;
     }
+
     const mockCompletion = autocompletion({
       override: [
         async (context) => {
@@ -90,7 +101,7 @@ function initialize() {
         history(),
         oneDark,
         javascript(),
-        yCollab(ytext, this.awareness),
+        yCollab(ytext, awareness),
         mockCompletion,
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
@@ -117,6 +128,8 @@ function initialize() {
     if (this.editorView) {
       this.editorView.destroy();
     }
+
+    this.wsService.destroy();
   }
 
   updateCursor(state: EditorState) {

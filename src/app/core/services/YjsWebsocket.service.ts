@@ -1,65 +1,102 @@
-import { Injectable, OnDestroy } from '@angular/core';
+// YjsWebsocket.service.ts
+import { Injectable } from '@angular/core';
 import * as Y from 'yjs';
-import { Observable, Subject } from 'rxjs';
+import { WebsocketProvider } from 'y-websocket';
+import { Awareness } from 'y-protocols/awareness';
 
-@Injectable({
-  providedIn: 'root',
-})
-export class YjsWebsocketService implements OnDestroy {
-  public ydoc: Y.Doc;
-  private ws: WebSocket | null = null;
-  private readonly destroy$ = new Subject<void>();
-  private readonly docUpdateSubject = new Subject<Y.Doc>();
+@Injectable({ providedIn: 'root' })
+export class YjsWebsocketService {
+  ydoc: Y.Doc;
+  provider?: WebsocketProvider;
+  private connectedRoom: string | null = null;
 
-  public docUpdate$: Observable<Y.Doc> = this.docUpdateSubject.asObservable();
+  private wsUrl = 'ws://localhost:1234';
 
   constructor() {
     this.ydoc = new Y.Doc();
   }
 
-  public connect(room: string, url: string = 'ws://localhost:3000'): void {
-    if (this.ws) {
-      this.ws.close();
+  async connect(roomId: string): Promise<void> {
+    if (this.connectedRoom === roomId && this.provider?.shouldConnect) {
+      console.log(`Already connected to room: ${roomId}`);
+      return;
     }
 
-    const wsUrl = `${url}/${room}`;
-    this.ws = new WebSocket(wsUrl);
-    this.ws.binaryType = 'arraybuffer';
-
-    this.ws.onopen = () => {
-      console.log(`WebSocket connected to room: ${room}`);
-    };
-
-    this.ws.onmessage = (event) => {
+    if (this.provider) {
       try {
-        const update = new Uint8Array(event.data as ArrayBuffer);
-        Y.applyUpdate(this.ydoc, update, this.ws);
-        this.docUpdateSubject.next(this.ydoc);
-      } catch (err) {
-        console.error('Failed to apply incoming update:', err);
+        console.log(`Disconnecting from previous room: ${this.connectedRoom}`);
+        this.provider.disconnect();
+        this.provider.destroy();
+      } catch (e) {
+        console.warn('Previous provider destroy error:', e);
       }
-    };
+      this.provider = undefined;
+    }
 
-    this.ydoc.on('update', (update: Uint8Array, origin: any) => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN && origin !== this.ws) {
-        this.ws.send(update);
-      }
+    this.ydoc = new Y.Doc();
+    console.log(`Created new Y.Doc for room: ${roomId}`);
+
+    this.provider = new WebsocketProvider(this.wsUrl, roomId, this.ydoc, {
+      connect: true,
     });
 
-    this.ws.onclose = () => console.log('WebSocket disconnected.');
-    this.ws.onerror = (error) => console.error('WebSocket error:', error);
+    this.provider.on('status', (ev: { status: 'connecting' | 'connected' | 'disconnected' }) => {
+      console.log(`y-websocket status for room ${roomId}:`, ev.status);
+    });
+
+    this.connectedRoom = roomId;
+
+    this.getSharedText('codemirror');
+
+    return new Promise<void>((resolve) => {
+      let resolved = false;
+
+      const resolveHandler = () => {
+        if (!resolved) {
+          resolved = true;
+          console.log('Initial sync completed for room (via "sync" event):', roomId);
+          this.provider?.off('sync', resolveHandler); // Clean up listener
+          resolve();
+        }
+      };
+
+      if (this.provider) {
+        this.provider.on('sync', resolveHandler);
+      }
+
+      setTimeout(() => {
+        if (!resolved) {
+          console.warn(`Sync timeout reached for room ${roomId}. Proceeding.`);
+          resolveHandler(); 
+        }
+      }, 3000);
+    });
   }
 
-  public getSharedText(key: string = 'codemirror'): Y.Text {
-    return this.ydoc.getText(key);
+  getSharedText(name = 'codemirror'): Y.Text {
+    return this.ydoc.getText(name);
   }
 
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+  getAwareness(): Awareness | undefined {
+    return this.provider?.awareness;
+  }
+
+  destroy(): void {
+    if (this.provider) {
+      try {
+        this.provider.disconnect();
+        this.provider.destroy();
+      } catch (e) {
+        console.warn('Destroy provider error:', e);
+      }
+      this.provider = undefined;
     }
+    try {
+      this.ydoc.destroy();
+    } catch (e) {
+      console.warn('Y.Doc destroy error:', e);
+    }
+    this.connectedRoom = null;
+    console.log('YjsWebsocketService fully destroyed.');
   }
 }
