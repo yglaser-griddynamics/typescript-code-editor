@@ -1,11 +1,10 @@
 import { Injectable } from '@angular/core';
+import { environment } from '../../../environments/environment';
 
-// --- AI Completion Service (Uses Gemini API) ---
 @Injectable({ providedIn: 'root' })
 export class AiCompletionService {
-  private apiUrl =
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent';
-  private apiKey = 'AIzaSyAZQAkffsDPNdEIzkcIhiawZuimhBXP9wo';
+  private apiUrl = environment.geminiUrl;
+  private apiKey = environment.geminiApiKey;
   private readonly MAX_RETRIES = 3;
 
   private async fetchWithRetry(payload: any, retries: number = 0): Promise<any> {
@@ -41,9 +40,9 @@ export class AiCompletionService {
     }
 
     const systemPrompt =
-      "You are a highly efficient and concise JavaScript code completion engine. Based ONLY on the provided code context, return the single most probable and logically correct snippet to complete the user's thought. Do not provide explanations, surrounding syntax (like markdown code blocks or quotes), or multiple options. Only output the raw code snippet.";
+      'You are a highly efficient and concise JavaScript code completion engine. Based ONLY on the provided code context, return the single most probable and logically correct snippet.';
 
-    const userQuery = `Provide the single best JavaScript completion for the code that ends exactly here: \n\n\`\`\`javascript\n${context}\n\`\`\``;
+    const userQuery = `Provide the best JavaScript completion for the code that ends here:\n\n${context}`;
 
     const apiPayload = {
       contents: [{ parts: [{ text: userQuery }] }],
@@ -52,9 +51,15 @@ export class AiCompletionService {
 
     try {
       const result = await this.fetchWithRetry(apiPayload);
-      const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+      console.log('result', result);
+      let text =
+        result.candidates?.[0]?.content?.parts?.[0]?.text ||
+        result.candidates?.[0]?.output_text ||
+        result.candidates?.[0]?.content?.[0]?.text ||
+        null;
 
       if (text) {
+        console.log('text', text);
         return {
           suggestions: [
             {
@@ -67,7 +72,7 @@ export class AiCompletionService {
     } catch (error) {
       console.error('Gemini API Error:', error);
     }
-
+    console.log('is empty');
     return { suggestions: [] };
   }
 }

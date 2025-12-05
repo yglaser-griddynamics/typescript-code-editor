@@ -23,11 +23,10 @@ import {
   CompletionResult,
 } from '@codemirror/autocomplete';
 import { yCollab } from 'y-codemirror.next';
-import { Awareness } from 'y-protocols/awareness';
 import { YjsWebsocketService } from '../../core/services/yjs-websocket.service';
 import { RoomService } from '../../core/services/room.service';
 import { AiCompletionService } from '../../core/services/ai-completion.service';
-import { debouncePromise } from '../utils/debunce-utility';
+
 @Component({
   selector: 'app-editor',
   imports: [CommonModule],
@@ -49,9 +48,8 @@ function initialize() {
   );
 
   editorView!: EditorView;
-  private debouncedAiCompletionSource: (
-    context: CompletionContext
-  ) => Promise<CompletionResult | null>;
+  private debounceTimer: any = null;
+
   @ViewChild('editorContainer') editorContainer!: ElementRef<HTMLDivElement>;
 
   constructor(
@@ -59,17 +57,12 @@ function initialize() {
     private wsService: YjsWebsocketService,
     private roomService: RoomService,
     private aiCompletionService: AiCompletionService
-  ) {
-    this.debouncedAiCompletionSource = debouncePromise(this.getAiCompletions.bind(this), 300);
-    console.log('Debounced AI Completion Source initialized', this.debouncedAiCompletionSource);
-  }
+  ) {}
 
   ngOnInit(): void {
     this.route.paramMap.subscribe(async (params) => {
       this.roomId = params.get('roomId') ?? 'unknown';
-
       await this.wsService.connect(this.roomId);
-
       if (this.editorView) {
         this.editorView.destroy();
       }
@@ -78,39 +71,72 @@ function initialize() {
   }
 
   ngAfterViewInit(): void {}
-  private async getAiCompletions(context: CompletionContext): Promise<CompletionResult | null> {
-    const word = context.matchBefore(/\w*(\.)?\w*/);
-    if (!word || (word.from === context.pos && !context.explicit)) {
-      if (!context.explicit) return null;
-    }
 
-    const fullText = context.state.doc.toString();
-    const cursorPosition = context.pos;
-
-    const result = await this.aiCompletionService.getCompletions({
-      fullText: fullText,
-      cursorPosition: cursorPosition,
-    });
-
-    const completions: Completion[] = result.suggestions.map((suggestion) => ({
-      label: suggestion.label,
-      type: 'snippet',
-      apply: suggestion.label,
-    }));
-
-    if (completions.length > 0) {
-      return {
-        from: word && word.text.length > 0 ? word.from : context.pos,
-        options: completions,
-        validFor: /\w*(\.)?\w*/,
-      };
-    }
-
-    return null;
+  private getMockCompletions(context: CompletionContext): CompletionResult | null {
+    const word = context.matchBefore(/\w*/);
+    if (!word) return null;
+    return {
+      from: word.from,
+      options: [
+        { label: 'console.log', type: 'function', apply: 'console.log()' },
+        { label: 'setTimeout', type: 'function', apply: 'setTimeout(() => {}, 1000)' },
+        { label: 'function', type: 'keyword' },
+      ],
+    };
   }
+
+  private getAiCompletions(context: CompletionContext): Promise<CompletionResult | null> {
+    const word = context.matchBefore(/\w*(\.)?\w*/);
+
+    if (!word || (word.from === context.pos && !context.explicit)) {
+      if (!context.explicit) return Promise.resolve(null);
+    }
+
+    return new Promise((resolve) => {
+      if (this.debounceTimer) clearTimeout(this.debounceTimer);
+
+      this.debounceTimer = setTimeout(async () => {
+        try {
+          const fullText = context.state.doc.toString();
+          const cursorPosition = context.pos;
+
+          const result = await this.aiCompletionService.getCompletions({
+            fullText: fullText,
+            cursorPosition: cursorPosition,
+          });
+
+          if (result.suggestions && result.suggestions.length > 0) {
+            const rawLabel = result.suggestions[0].label;
+
+            const shortLabel = rawLabel.length > 50 ? rawLabel.substring(0, 47) + '...' : rawLabel;
+
+            const completions: Completion[] = [
+              {
+                label: shortLabel,
+                detail: '✨ AI',
+                type: 'text',
+                apply: rawLabel,
+                boost: 99,
+              },
+            ];
+
+            resolve({
+              from: word ? word.from : context.pos,
+              options: completions,
+              filter: false,
+            });
+            return;
+          }
+        } catch (error) {
+          console.warn('AI Completion failed, using mock.', error);
+        }
+        resolve(this.getMockCompletions(context));
+      }, 1);
+    });
+  }
+
   initializeCodeMirror(): void {
     const ytext = this.wsService.getSharedText('codemirror');
-
     const awareness = this.wsService.getAwareness();
 
     if (!awareness) {
@@ -118,30 +144,12 @@ function initialize() {
       return;
     }
 
-    const mockCompletion = autocompletion({
-      override: [
-        async (context) => {
-          const word = context.matchBefore(/\w*/);
-          if (!word) return null;
-
-          return {
-            from: word.from,
-            options: [
-              { label: 'console.log', type: 'function', apply: 'console.log()' },
-              { label: 'setTimeout', type: 'function', apply: 'setTimeout(() => {}, 1000)' },
-              { label: 'function', type: 'keyword' },
-            ],
-          };
-        },
-      ],
+    const hybridCompletion = autocompletion({
+      override: [this.getAiCompletions.bind(this)],
+      icons: true,
+      interactionDelay: 1,
     });
 
-    const aiCompletion = autocompletion({
-      override: [this.debouncedAiCompletionSource],
-      // Optional: Increase the delay to reduce API calls while typing rapidly
-      // activateOnType: true,
-      // maxRenderedOptions: 1
-    });
     const startState = EditorState.create({
       doc: ytext.toString(),
       extensions: [
@@ -149,8 +157,7 @@ function initialize() {
         oneDark,
         javascript(),
         yCollab(ytext, awareness),
-        aiCompletion,
-
+        hybridCompletion,
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
@@ -176,7 +183,6 @@ function initialize() {
     if (this.editorView) {
       this.editorView.destroy();
     }
-
     this.wsService.destroy();
   }
 
