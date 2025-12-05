@@ -3,11 +3,13 @@ import { BehaviorSubject } from 'rxjs';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { Room } from '../models/rooms.model';
+import { LocalStorageService } from './local-storage.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class RoomService implements OnDestroy {
+  private STORAGE_KEY = 'webstudio_rooms';
   private DEFAULT_ROOM_ID = 'default';
 
   private roomsSubject = new BehaviorSubject<Room[]>([]);
@@ -16,10 +18,10 @@ export class RoomService implements OnDestroy {
   private currentRoomId: string | null = null;
   private isInitialUserAdded = false;
 
-  constructor(private router: Router) {
+  constructor(private router: Router, private localStorageService: LocalStorageService) {
+    this.loadFromStorage();
     this.setupRouteListener();
     this.setupStorageListeners();
-
     this.ensureDefaultRoom();
 
     const initialUrl = this.router.url;
@@ -29,10 +31,18 @@ export class RoomService implements OnDestroy {
   public ensureDefaultRoom() {
     const rooms = this.roomsSubject.value;
     if (!rooms.find((r) => r.id === this.DEFAULT_ROOM_ID)) {
-      this.updateState([
-        ...rooms,
-        { id: this.DEFAULT_ROOM_ID, name: this.DEFAULT_ROOM_ID, users: 0 },
-      ]);
+      const defaultRoom: Room = { id: this.DEFAULT_ROOM_ID, name: this.DEFAULT_ROOM_ID, users: 0 };
+      const hasActiveRooms = rooms.some((r) => r.users > 0);
+      let newRooms = rooms;
+      if (!hasActiveRooms && rooms.length > 0) {
+        
+        newRooms = [defaultRoom];
+      } else {
+        
+        newRooms = [...rooms, defaultRoom];
+      }
+
+      this.updateState(newRooms);
     }
   }
 
@@ -66,6 +76,13 @@ export class RoomService implements OnDestroy {
   }
 
   private setupStorageListeners() {
+    window.addEventListener('storage', (event) => {
+      if (event.key === this.STORAGE_KEY) {
+        this.loadFromStorage();
+        this.ensureDefaultRoom();
+      }
+    });
+
     window.addEventListener('beforeunload', () => {
       this.leaveRoom(true);
     });
@@ -123,6 +140,23 @@ export class RoomService implements OnDestroy {
   }
 
   private updateState(rooms: Room[]) {
+    const hasOnlyDefault =
+      rooms.length === 1 && rooms[0].id === this.DEFAULT_ROOM_ID && rooms[0].users === 0;
+
+    if (hasOnlyDefault) {
+      this.localStorageService.remove(this.STORAGE_KEY);
+    } else {
+      this.localStorageService.set(this.STORAGE_KEY, rooms);
+    }
     this.roomsSubject.next(rooms);
+  }
+
+  private loadFromStorage() {
+    const loadedRooms = this.localStorageService.get<Room[]>(this.STORAGE_KEY);
+    if (loadedRooms && Array.isArray(loadedRooms)) {
+      this.roomsSubject.next(loadedRooms);
+    } else {
+      this.roomsSubject.next([]);
+    }
   }
 }
