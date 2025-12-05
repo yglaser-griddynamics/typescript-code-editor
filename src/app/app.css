@@ -1,9 +1,8 @@
 :host {
   font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  color: #c9d1d9; /* GitHub/VS Code foreground text color */
+  color: #c9d1d9;
 }
 
-/* Scrollbar Styling to match the dark theme (Optional but recommended) */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
