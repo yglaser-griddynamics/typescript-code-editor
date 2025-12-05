@@ -1,18 +1,11 @@
-<div class="container admin-container">
-  <div class="row w-100 justify-content-between g-4">
+<div class="d-flex flex-column h-100 w-100 bg-darker">
+  <div class="w-100">
+    <app-room-create-card (roomSelected)="enterRoom($event)"></app-room-create-card>
+  </div>
 
-    <div class="col-md-5">
-      <app-room-create-card 
-        (roomSelected)="enterRoom($event)">
-      </app-room-create-card>
-    </div>
+  <hr class="m-0 border-secondary opacity-25" />
 
-    <div class="col-md-7">
-      <app-room-list 
-        [rooms]="rooms$ | async"
-        (roomClicked)="enterRoom($event)">
-      </app-room-list>
-    </div>
-
+  <div class="flex-grow-1 w-100 overflow-auto custom-scrollbar">
+    <app-room-list [rooms]="rooms$ | async" (roomClicked)="enterRoom($event)"></app-room-list>
   </div>
 </div>

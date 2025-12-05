@@ -46,3 +46,48 @@
   border: 1px dashed var(--border-color);
   border-radius: 4px;
 }
+
+.list-group-item-action:hover {
+  background-color: #21262d !important; /* Dark grey hover */
+  color: #fff !important;
+}
+
+.list-group-item-action.selected {
+  background-color: #21262d !important; /* Dark grey hover */
+  color: #fff !important;
+}
+
+/* --- Fix 1: Make titles white --- */
+.sidebar-title {
+  color: #ffffff; /* Pure white */
+  font-weight: 600; /* Make it bold */
+  text-transform: uppercase;
+  font-size: 0.8rem; /* Keep it small but legible */
+  opacity: 0.9; /* Optional: slightly softer than pure white */
+  margin-bottom: 10px; /* Space below the title */
+  display: flex; /* Aligns icon and text if you have them */
+  align-items: center;
+}
+
+/* --- Fix 2: Selected Room & Hover State --- */
+.room-item {
+  padding: 10px 15px;
+  cursor: pointer;
+  color: #9ca3af; /* Default text color (gray) */
+  transition: all 0.2s ease;
+  border-radius: 4px; /* Optional: rounded corners */
+}
+
+.room-item:hover,
+.room-item.active {
+  background-color: #1f2937; /* Darker background for selection */
+  color: #ffffff;
+  font-weight: bold; /* Bright white text */
+  cursor: pointer;
+}
+
+/* Optional: Add a left border to the active item to make it pop */
+.room-item.active {
+  border-left: 3px solid #0ea5e9 !important; /* Blue indicator */
+  padding-left: 8px !important; /* Adjust padding to accommodate border */
+}

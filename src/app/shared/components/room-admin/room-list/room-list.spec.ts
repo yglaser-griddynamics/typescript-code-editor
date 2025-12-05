@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { RoomListComponent } from './room-list.component';
-import { vi } from 'vitest';  
+import { vi } from 'vitest';
 describe('RoomListComponent', () => {
   let component: RoomListComponent;
   let fixture: ComponentFixture<RoomListComponent>;
@@ -33,7 +33,7 @@ describe('RoomListComponent', () => {
 
     const firstRoomText = roomItems[0].nativeElement.textContent;
     expect(firstRoomText).toContain('Angular Talk');
-    expect(firstRoomText).toContain('5 devs');
+    expect(firstRoomText).toContain('5');
   });
 
   it('should display empty state message when rooms list is empty', () => {

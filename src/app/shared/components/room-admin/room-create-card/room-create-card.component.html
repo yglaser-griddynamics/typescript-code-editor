@@ -1,16 +1,19 @@
-<div class="card h-100 p-4">
-  <h5 class="card-title">🚀 Create Room</h5>
-  <p class="text-muted small">Create a new session or join an existing room ID.</p>
+<div class="p-3">
+  <h6
+    class="text-uppercase fw-bold mb-3 text-white"
+    style="font-size: 0.75rem; letter-spacing: 0.5px"
+  >
+    <span class="me-2 text-white">🚀</span>Create Room
+  </h6>
 
-  <div class="input-group mt-3">
+  <div class="d-flex flex-column gap-2">
     <input
       type="text"
-      class="form-control form-control-lg"
+      class="form-control form-control-sm bg-dark text-light border-secondary"
       placeholder="Room ID (e.g. coding-12)"
       [(ngModel)]="inputRoomId"
       (keyup.enter)="submit()"
     />
-
-    <button class="btn btn-primary px-4" type="button" (click)="submit()">JOIN</button>
+    <button class="btn btn-primary btn-sm w-100" type="button" (click)="submit()">JOIN</button>
   </div>
 </div>

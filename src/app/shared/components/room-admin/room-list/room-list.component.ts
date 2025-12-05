@@ -7,6 +7,11 @@ import { Component, Input, Output, EventEmitter } from '@angular/core';
   standalone: false,
 })
 export class RoomListComponent {
+  public activeRoomId: string | null = null;
   @Input() rooms: any[] | null = [];
   @Output() roomClicked = new EventEmitter<string>();
+  public enterRoom(roomId: string) {
+    this.activeRoomId = roomId;
+    this.roomClicked.emit(roomId);
+  }
 }
