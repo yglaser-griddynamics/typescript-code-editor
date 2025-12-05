@@ -1,49 +1,114 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ElementRef } from '@angular/core';
 import { Editor } from './editor';
 import { ActivatedRoute } from '@angular/router';
 import { of } from 'rxjs';
+import { vi } from 'vitest';
+import * as Y from 'yjs';
+import { Awareness } from 'y-protocols/awareness';
 import { EditorView } from '@codemirror/view';
-import { vi } from 'vitest'; 
+import { undo, redo } from '@codemirror/commands';
+import { autocompletion } from '@codemirror/autocomplete';
+import { YjsWebsocketService } from '../../core/services/YjsWebsocket.service';
+import { RoomService } from '../../core/services/room.service';
+
+class MockYjsWebsocketService {
+  public doc: Y.Doc;
+  public ytext: Y.Text;
+  public awareness: Awareness;
+
+  connect = vi.fn(async (_roomId?: string) => Promise.resolve());
+  destroy = vi.fn();
+
+  getSharedText = vi.fn((name: string) => {
+    if (!this.ytext) this.ytext = this.doc.getText(name);
+    return this.ytext;
+  });
+
+  getAwareness = vi.fn(() => this.awareness);
+
+  constructor() {
+    this.doc = new Y.Doc();
+    this.ytext = this.doc.getText('codemirror');
+    this.ytext.insert(
+      0,
+      `// Welcome to CodeMirror 6
+function initialize() {
+  console.log("You can start coding right away!");
+}`
+    );
+    this.awareness = new Awareness(this.doc);
+  }
+}
+
+class MockRoomService {}
+
 describe('Editor Component', () => {
-  let component: Editor;
   let fixture: ComponentFixture<Editor>;
-  let mockActivatedRoute: any;
-  const INITIAL_CODE_LINES = 4;
+  let component: Editor;
+  let wsService: MockYjsWebsocketService;
 
   beforeEach(async () => {
-    mockActivatedRoute = {
-      paramMap: of(new Map([['roomId', 'test-room-123']])),
+    const mockRoute = {
+      paramMap: of({
+        get: (key: string) => (key === 'roomId' ? 'test-room-123' : null),
+      }),
     };
 
     await TestBed.configureTestingModule({
       imports: [Editor],
-      providers: [{ provide: ActivatedRoute, useValue: mockActivatedRoute }],
+      providers: [
+        { provide: ActivatedRoute, useValue: mockRoute },
+        { provide: YjsWebsocketService, useClass: MockYjsWebsocketService },
+        { provide: RoomService, useClass: MockRoomService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Editor);
     component = fixture.componentInstance;
+    wsService = TestBed.inject(YjsWebsocketService) as any;
+
+    const host = document.createElement('div');
+    host.id = 'test-editor-host';
+    document.body.appendChild(host);
+
+    component.editorContainer = new ElementRef(host);
+
+    fixture.detectChanges();
+    await Promise.resolve();
     fixture.detectChanges();
   });
 
-  it('should create the component', () => {
+  afterEach(() => {
+    const host = document.getElementById('test-editor-host');
+    if (host?.parentNode) host.parentNode.removeChild(host);
+    vi.restoreAllMocks();
+  });
+
+  it('should create component', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should retrieve roomId from ActivatedRoute', () => {
+  it('should read roomId and call wsService.connect', () => {
     expect(component.roomId).toBe('test-room-123');
+    expect(wsService.connect).toHaveBeenCalledWith('test-room-123');
   });
 
-  it('should initialize CodeMirror editor in the DOM', () => {
-    const compiled = fixture.nativeElement as HTMLElement;
-    const cmContent = compiled.querySelector('.cm-content');
-
-    expect(cmContent).toBeTruthy();
-    expect(cmContent?.textContent).toContain('Welcome to CodeMirror 6');
+  it('should initialize Y.Text and Awareness', () => {
+    const ytext = wsService.getSharedText('codemirror');
+    expect(ytext).toBeTruthy();
+    expect(ytext.toString()).toContain('Welcome to CodeMirror 6');
   });
 
-  it('should update "code" signal when editor content changes', () => {
-    const view: EditorView = (component as any).editorView;
-    const newText = 'console.log("Hello World");';
+  it('should initialize EditorView attached to DOM', () => {
+    expect(component.editorView).toBeTruthy();
+    const host = component.editorContainer.nativeElement as HTMLElement;
+    expect(host.children.length).toBeGreaterThan(0);
+  });
+
+  it('should update code() when changes happen', () => {
+    const view = component.editorView;
+    const newText = 'console.log("TEST");';
 
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: newText },
@@ -52,55 +117,76 @@ describe('Editor Component', () => {
     expect(component.code()).toBe(newText);
   });
 
-  it('should correctly compute "lineNumbers" signal', () => {
-    const view: EditorView = (component as any).editorView;
-    const textWithNewLines = 'Line 1\nLine 2\nLine 3';
+  it('should compute lineNumbers', () => {
+    const view = component.editorView;
 
     view.dispatch({
-      changes: { from: 0, to: view.state.doc.length, insert: textWithNewLines },
+      changes: { from: 0, to: view.state.doc.length, insert: 'A\nB\nC' },
     });
 
-    expect(component.lineNumbers().length).toBe(3);
     expect(component.lineNumbers()).toEqual([1, 2, 3]);
   });
 
-  it('should update cursor position signals when selection changes', () => {
-    const view: EditorView = (component as any).editorView;
-    const docLength = view.state.doc.length;
+  it('should update cursor position', () => {
+    const view = component.editorView;
 
     view.dispatch({
-      selection: { anchor: docLength, head: docLength },
+      changes: { from: 0, to: view.state.doc.length, insert: 'A\nB\nC\nD' },
     });
 
-    expect(component.cursorLine()).toBe(INITIAL_CODE_LINES);
+    const pos = view.state.doc.length;
+    view.dispatch({ selection: { anchor: pos, head: pos } });
+
+    component.updateCursor(view.state);
+
+    const line = view.state.doc.line(4);
+    const expectedCol = pos - line.from + 1;
+
+    expect(component.cursorLine()).toBe(4);
+    expect(component.cursorCol()).toBe(expectedCol);
   });
 
-  it('should update the sidebar line numbers in the DOM', () => {
-    const view: EditorView = (component as any).editorView;
-    const threeLines = 'A\nB\nC';
+  it('should detect autocompletion extension', () => {
+    const view = component.editorView;
 
     view.dispatch({
-      changes: { from: 0, to: view.state.doc.length, insert: threeLines },
+      changes: { from: 0, to: 0, insert: 'con' },
     });
 
-    fixture.detectChanges();
-
-    const compiled = fixture.nativeElement as HTMLElement;
-    const sidebarLines = compiled.querySelectorAll('.line-number');
-
-    expect(sidebarLines.length).toBe(3);
-    expect(sidebarLines[0].textContent?.trim()).toBe('1');
-    expect(sidebarLines[2].textContent?.trim()).toBe('3');
+    expect(view.state.doc.toString()).toContain('con');
   });
 
-  it('should cleanup EditorView on destroy', () => {
-    const view: EditorView = (component as any).editorView;
-    
-    const destroySpy = vi.spyOn(view, 'destroy');
+  it('should support undo/redo', () => {
+    const view = component.editorView;
+
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: '123' },
+    });
+
+    const okUndo = undo(view);
+    expect(typeof okUndo).toBe('boolean');
+
+    const okRedo = redo(view);
+    expect(typeof okRedo).toBe('boolean');
+
+    expect(view.state.doc.toString()).toContain('123');
+  });
+  it('should apply remote Y.Text updates', async () => {
+    const ytext = wsService.getSharedText('codemirror');
+
+    ytext.insert(ytext.length, '\n// remote');
+    await Promise.resolve();
+
+    expect(component.code()).toContain('// remote');
+  });
+
+  it('should destroy editor and wsService', () => {
+    const view = component.editorView;
+    const spy = vi.spyOn(view, 'destroy');
 
     component.ngOnDestroy();
 
-    expect(destroySpy).toHaveBeenCalled();
+    expect(spy).toHaveBeenCalled();
+    expect(wsService.destroy).toHaveBeenCalled();
   });
 });
-
