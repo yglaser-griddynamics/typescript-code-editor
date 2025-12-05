@@ -24,10 +24,10 @@ import {
 } from '@codemirror/autocomplete';
 import { yCollab } from 'y-codemirror.next';
 import { Awareness } from 'y-protocols/awareness';
-import { YjsWebsocketService } from '../../core/services/YjsWebsocket.service';
+import { YjsWebsocketService } from '../../core/services/yjs-websocket.service';
 import { RoomService } from '../../core/services/room.service';
-import { AiCompletionService } from '../../core/services/AiCompletion.service';
-
+import { AiCompletionService } from '../../core/services/ai-completion.service';
+import { debouncePromise } from '../utils/debunce-utility';
 @Component({
   selector: 'app-editor',
   imports: [CommonModule],
@@ -49,7 +49,9 @@ function initialize() {
   );
 
   editorView!: EditorView;
-
+  private debouncedAiCompletionSource: (
+    context: CompletionContext
+  ) => Promise<CompletionResult | null>;
   @ViewChild('editorContainer') editorContainer!: ElementRef<HTMLDivElement>;
 
   constructor(
@@ -57,7 +59,10 @@ function initialize() {
     private wsService: YjsWebsocketService,
     private roomService: RoomService,
     private aiCompletionService: AiCompletionService
-  ) {}
+  ) {
+    this.debouncedAiCompletionSource = debouncePromise(this.getAiCompletions.bind(this), 300);
+    console.log('Debounced AI Completion Source initialized', this.debouncedAiCompletionSource);
+  }
 
   ngOnInit(): void {
     this.route.paramMap.subscribe(async (params) => {
@@ -73,35 +78,36 @@ function initialize() {
   }
 
   ngAfterViewInit(): void {}
-  aiCompletionSource = async (context: CompletionContext): Promise<CompletionResult | null> => {
-    const lastChar = context.state.sliceDoc(context.pos - 1, context.pos);
-    const triggerChars = /[\w.]/;
+  private async getAiCompletions(context: CompletionContext): Promise<CompletionResult | null> {
+    const word = context.matchBefore(/\w*(\.)?\w*/);
+    if (!word || (word.from === context.pos && !context.explicit)) {
+      if (!context.explicit) return null;
+    }
 
-    if (context.explicit || triggerChars.test(lastChar)) {
-      const fullText = context.state.doc.toString();
-      const cursorPosition = context.pos;
+    const fullText = context.state.doc.toString();
+    const cursorPosition = context.pos;
 
-      const result = await this.aiCompletionService.getCompletions({
-        fullText: fullText,
-        cursorPosition: cursorPosition,
-      });
+    const result = await this.aiCompletionService.getCompletions({
+      fullText: fullText,
+      cursorPosition: cursorPosition,
+    });
 
-      const completions: Completion[] = result.suggestions.map((suggestion) => ({
-        label: suggestion.label,
-        type: suggestion.type,
-        apply: suggestion.label,
-      }));
+    const completions: Completion[] = result.suggestions.map((suggestion) => ({
+      label: suggestion.label,
+      type: 'snippet',
+      apply: suggestion.label,
+    }));
 
-      if (completions.length > 0) {
-        return {
-          from: context.pos,
-          options: completions,
-        };
-      }
+    if (completions.length > 0) {
+      return {
+        from: word && word.text.length > 0 ? word.from : context.pos,
+        options: completions,
+        validFor: /\w*(\.)?\w*/,
+      };
     }
 
     return null;
-  };
+  }
   initializeCodeMirror(): void {
     const ytext = this.wsService.getSharedText('codemirror');
 
@@ -131,7 +137,7 @@ function initialize() {
     });
 
     const aiCompletion = autocompletion({
-      override: [this.aiCompletionSource],
+      override: [this.debouncedAiCompletionSource],
       // Optional: Increase the delay to reduce API calls while typing rapidly
       // activateOnType: true,
       // maxRenderedOptions: 1
@@ -144,6 +150,7 @@ function initialize() {
         javascript(),
         yCollab(ytext, awareness),
         aiCompletion,
+
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
