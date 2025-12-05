@@ -8,30 +8,39 @@ import { Room } from '../models/rooms.model';
   providedIn: 'root',
 })
 export class RoomService implements OnDestroy {
-  private STORAGE_KEY = 'webstudio_rooms';
   private DEFAULT_ROOM_ID = 'default';
 
-  private roomsSubject = new BehaviorSubject<Room[]>([
-    { id: this.DEFAULT_ROOM_ID, name: this.DEFAULT_ROOM_ID, users: 0 },
-  ]);
+  private roomsSubject = new BehaviorSubject<Room[]>([]);
   rooms$ = this.roomsSubject.asObservable();
 
   private currentRoomId: string | null = null;
   private isInitialUserAdded = false;
 
   constructor(private router: Router) {
-    this.loadFromStorage();
     this.setupRouteListener();
     this.setupStorageListeners();
 
+    this.ensureDefaultRoom();
+
     const initialUrl = this.router.url;
     this.handleNavigation(initialUrl);
+  }
+
+  public ensureDefaultRoom() {
+    const rooms = this.roomsSubject.value;
+    if (!rooms.find((r) => r.id === this.DEFAULT_ROOM_ID)) {
+      this.updateState([
+        ...rooms,
+        { id: this.DEFAULT_ROOM_ID, name: this.DEFAULT_ROOM_ID, users: 0 },
+      ]);
+    }
   }
 
   private setupRouteListener() {
     this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd))
       .subscribe((event: NavigationEnd) => {
+        this.ensureDefaultRoom();
         const url = event.urlAfterRedirects;
         this.handleNavigation(url);
       });
@@ -46,20 +55,17 @@ export class RoomService implements OnDestroy {
     const possibleRoomId = url.substring(1).split('?')[0].split('#')[0];
 
     if (possibleRoomId) {
-      console.log(`Navigating to room: ${possibleRoomId}`);
-      this.enterRoom(possibleRoomId);
+      const existing = this.getRooms().find((r) => r.id === possibleRoomId);
+
+      if (existing) {
+        this.enterRoom(possibleRoomId);
+      }
     } else {
       this.leaveRoom();
     }
   }
 
   private setupStorageListeners() {
-    window.addEventListener('storage', (event) => {
-      if (event.key === this.STORAGE_KEY) {
-        this.loadFromStorage();
-      }
-    });
-
     window.addEventListener('beforeunload', () => {
       this.leaveRoom(true);
     });
@@ -71,7 +77,6 @@ export class RoomService implements OnDestroy {
 
   enterRoom(roomId: string) {
     if (this.currentRoomId && this.currentRoomId !== roomId) {
-      console.log(`Leaving previous room: ${this.currentRoomId}`);
       this.decrementUserCount(this.currentRoomId);
     }
 
@@ -108,11 +113,8 @@ export class RoomService implements OnDestroy {
     const roomIndex = rooms.findIndex((r) => r.id === roomId);
 
     if (roomIndex !== -1) {
-      const currentUsers = rooms[roomIndex].users;
-
-      rooms[roomIndex].users = Math.max(0, currentUsers - 1);
+      rooms[roomIndex].users = Math.max(0, rooms[roomIndex].users - 1);
     }
-
     this.updateState(rooms);
   }
 
@@ -121,24 +123,6 @@ export class RoomService implements OnDestroy {
   }
 
   private updateState(rooms: Room[]) {
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(rooms));
-
     this.roomsSubject.next(rooms);
-  }
-
-  private loadFromStorage() {
-    const data = localStorage.getItem(this.STORAGE_KEY);
-    if (data) {
-      try {
-        const loadedRooms: Room[] = JSON.parse(data);
-
-        if (!loadedRooms.find((r) => r.id === this.DEFAULT_ROOM_ID)) {
-          loadedRooms.push({ id: this.DEFAULT_ROOM_ID, name: this.DEFAULT_ROOM_ID, users: 0 });
-        }
-        this.roomsSubject.next(loadedRooms);
-      } catch (e) {
-        console.error('Error parsing rooms', e);
-      }
-    }
   }
 }

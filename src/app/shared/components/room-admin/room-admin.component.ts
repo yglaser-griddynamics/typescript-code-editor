@@ -18,11 +18,15 @@ export class RoomAdminComponent implements OnInit {
 
   ngOnInit() {
     this.roomService.leaveRoom();
+    this.roomService.ensureDefaultRoom();
   }
 
   enterRoom(roomId: string) {
+    const roomIdWithoutSpaces = roomId.replace(/\s/g, '-').toLowerCase();
+
     if (!roomId.trim()) return;
-    this.router.navigate(['/', roomId]);
+    this.roomService.enterRoom(roomIdWithoutSpaces);
+    this.router.navigate(['/', roomIdWithoutSpaces]);
     this.inputRoomId = '';
   }
 }
