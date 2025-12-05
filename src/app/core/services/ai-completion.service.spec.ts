@@ -1,22 +1,28 @@
-import { TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { TestBed } from '@angular/core/testing';
 import { AiCompletionService } from './ai-completion.service';
 
 describe('AiCompletionService', () => {
-  let service: AiCompletionService;
-
-  // Helper to mock fetch responses quickly
+  let service: AiCompletionService;  
   const mockFetch = (response: any, ok = true) => {
     return Promise.resolve({
       ok,
       status: ok ? 200 : 500,
       json: () => Promise.resolve(response),
-    });
+    } as Response);
   };
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
     service = TestBed.inject(AiCompletionService);
-    spyOn(window, 'fetch');
+
+    vi.restoreAllMocks();
+    vi.spyOn(window, 'fetch');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers(); 
   });
 
   it('should return empty suggestions for empty context', async () => {
@@ -31,34 +37,54 @@ describe('AiCompletionService', () => {
       candidates: [{ content: { parts: [{ text: `\`\`\`javascript\n${mockText}\n\`\`\`` }] } }],
     };
 
-    (window.fetch as jasmine.Spy).and.returnValue(mockFetch(response));
+    
+    vi.mocked(window.fetch).mockReturnValue(mockFetch(response));
 
     const result = await service.getCompletions({ fullText: 'code', cursorPosition: 4 });
 
     expect(result.suggestions[0].label).toBe(mockText);
   });
 
-  it('should retry 3 times on failure', fakeAsync(() => {
-    (window.fetch as jasmine.Spy).and.returnValue(Promise.resolve({ ok: false, status: 500 }));
+  it('should retry 3 times on failure', async () => {
+    
+    vi.useFakeTimers();
 
-    service.getCompletions({ fullText: 'retry', cursorPosition: 5 });
+    
+    vi.mocked(window.fetch).mockReturnValue(
+      Promise.resolve({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+      } as Response)
+    );
 
-    // Fast-forward through backoff delays (1s, 2s, 4s)
-    tick(1000);
-    tick(2000);
-    tick(4000);
+    
+    const promise = service.getCompletions({ fullText: 'retry', cursorPosition: 5 });
 
-    // Initial call + 3 retries = 4 calls
+  
+    await vi.advanceTimersByTimeAsync(1000); 
+    await vi.advanceTimersByTimeAsync(2000); 
+    await vi.advanceTimersByTimeAsync(4000); 
+
+    
+    await promise;
+
     expect(window.fetch).toHaveBeenCalledTimes(4);
-  }));
+  });
 
   it('should return empty array on catastrophic failure', async () => {
-    (window.fetch as jasmine.Spy).and.rejectWith(new Error('Network down'));
+   
+    vi.useFakeTimers();
+    vi.mocked(window.fetch).mockRejectedValue(new Error('Network down'));
 
-    // Bypass retries for this test to keep it sync-ish, or just expect the catch block
-    // forcing quick failure by mocking private MAX_RETRIES if needed,
-    // but here we just check the final catch block.
-    const res = await service.getCompletions({ fullText: 'fail', cursorPosition: 4 });
+ 
+    const promise = service.getCompletions({ fullText: 'fail', cursorPosition: 4 });
+
+
+    await vi.advanceTimersByTimeAsync(8000);
+
+    const res = await promise;
+
     expect(res.suggestions).toEqual([]);
   });
 });

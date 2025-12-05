@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { RoomHistoryService } from './room-history.service';
 
@@ -11,9 +12,15 @@ describe('RoomHistoryService', () => {
 
     // Mock storage
     mockStore = {};
-    spyOn(localStorage, 'getItem').and.callFake((key) => mockStore[key] || null);
-    spyOn(localStorage, 'setItem').and.callFake((key, val) => (mockStore[key] = val));
-    spyOn(localStorage, 'removeItem').and.callFake((key) => delete mockStore[key]);
+
+    // In Vitest, spy on Storage.prototype to capture localStorage calls
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => mockStore[key] || null);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, val) => (mockStore[key] = val));
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key) => delete mockStore[key]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks(); // Important to clear spies between tests
   });
 
   it('should save snapshots', () => {

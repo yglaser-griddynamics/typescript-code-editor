@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { LocalStorageService } from './local-storage.service';
 
@@ -11,9 +12,15 @@ describe('LocalStorageService', () => {
 
     // Reset store
     store = {};
-    spyOn(localStorage, 'getItem').and.callFake((key) => store[key] || null);
-    spyOn(localStorage, 'setItem').and.callFake((key, val) => (store[key] = val));
-    spyOn(localStorage, 'removeItem').and.callFake((key) => delete store[key]);
+
+    // Mock Storage prototype for localStorage interaction
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => store[key] || null);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, val) => (store[key] = val));
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key) => delete store[key]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('should parse JSON automatically', () => {
@@ -35,7 +42,7 @@ describe('LocalStorageService', () => {
 
   it('should catch JSON parse errors', () => {
     store['broken'] = '{ bad }';
-    const consoleSpy = spyOn(console, 'error');
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     expect(service.get('broken')).toBeNull();
     expect(consoleSpy).toHaveBeenCalled();
